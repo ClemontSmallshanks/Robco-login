@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build/package files
+build/
+dist/
+*.egg-info/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Runtime/state files
+*.lock
+*.pid
+
+# Logs
+*.log
+logs/
+
+# Local configuration/secrets
+.env
+.env.*
+secrets/
+*.secret
+
+# RobCo runtime state
+robco-greeter-lockout

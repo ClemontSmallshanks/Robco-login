@@ -1,0 +1,78 @@
+"""Curated word list for the Fallout-style hacking minigame.
+
+All words are 7-10 letters, uppercase, alphabetic only.
+Thematic categories: military, science, technology, wasteland, industrial.
+"""
+
+WORDS: list[str] = [
+    # 7-letter words
+    "REACTOR", "DECRYPT", "NETWORK", "PROGRAM", "SHELTER",
+    "BUNKERS", "COMMAND", "DEFENSE", "DIGITAL", "EXPLOIT",
+    "FACTORY", "GATEWAY", "HANDLER", "ISOLATE", "KILLBIT",
+    "LOADING", "MACHINE", "NUCLEAR", "OPERATE", "PASSAGE",
+    "QUANTUM", "REBUILD", "ROUTING", "SCANNER", "PROCESS",
+    "TARGETS", "UNIFORM", "VOLTAGE", "WARNING", "COUNTER",
+    "ARCHIVE", "BATTERY", "CAPSULE", "DEPOSIT", "ELEMENT",
+    "FIREARM", "GRENADE", "HOSTILE", "INSTALL", "JAVELIN",
+    "KEYWORD", "LOCKOUT", "MONITOR", "OUTPOST", "PATRIOT",
+    "RADICAL", "SALVAGE", "TRACKER", "UPLINKS", "WEAPONS",
+    "HACKING", "DOCKING", "CAPPING", "WARHEAD", "ORBITAL",
+    "STEALTH", "COMPLEX", "SURFACE", "PROFILE", "SECURED",
+    "MISSION", "TENSION", "COUNCIL", "SIGNALS", "BOLSTER",
+    "CONTAIN", "TURRETS", "ENGINES", "FALLOUT", "CRIMSON",
+    # 8-letter words
+    "TERMINAL", "SECURITY", "OVERRIDE", "PROTOCOL", "COMPOUND",
+    "ELECTRON", "MUTATION", "RADIATED", "CROSSBOW", "EXTERNAL",
+    "FIRMWARE", "GENERATE", "HYDROGEN", "IGNITION", "JUNCTION",
+    "KEYBOARD", "LANGUAGE", "MANIFEST", "NOMINALS", "OCCUPIED",
+    "PARADIGM", "RELOCATE", "SANDWICH", "TRANSMIT", "UNLOCKED",
+    "VENTURED", "XXXXXXXX", "ZERGLING", "BACKBONE", "CARDINAL",
+    "DATABASE", "EASTSIDE", "FOOTHOLD", "GUARDIAN", "HEADBAND",
+    "INCIDENT", "JUDGMENT", "KILOWATT", "LOCKDOWN", "MONOPOLY",
+    "NEGATIVE", "OBSTACLE", "PLATFORM", "RECHARGE", "SPECTRUM",
+    "TRACKING", "UMBRELLA", "VELOCITY", "WORKSHOP", "ALLIANCE",
+    "CALIBERS", "DISPATCH", "EXCAVATE", "FORENSIC", "GEOPHONE",
+    "HABITUAL", "IMPERIAL", "JETTISON", "KEEPSAKE", "LINEAGES",
+    "MAINLAND", "NAVIGATE", "OLIGARCH", "POSITION", "REGULATE",
+    # 9-letter words
+    "DETONATOR", "PERIMETER", "DIRECTIVE", "OPERATING", "PROVISION",
+    "SCRAMBLER", "CLEARANCE", "ENCRYPTED", "FREQUENCY", "GEOMETRIC",
+    "HYDRAULIC", "INCURSION", "JOBSEEKER", "KEYSTROKE", "LIBERATOR",
+    "MEGAWATTS", "NANOSCALE", "OBJECTIVE", "PROCESSOR", "REACTANCE",
+    "SPONSORED", "TELEMETRY", "UNCOVERED", "VAPORIZED", "WRESTLERS",
+    "ANOMALIES", "BANDWIDTH", "CONTINENT", "DEDICATED", "ELIMINATE",
+    "FOOTPRINT", "GENERATOR", "HEADCOUNT", "INTERCEPT", "JACKKNIFE",
+    "LANDSCAPE", "MECHANISM", "NIGHTFALL", "OUTGUNNED", "POWERLINE",
+    "QUICKSAND", "REGULATOR", "SIMULATED", "THRESHOLD", "UNDERMINE",
+    "CENTURION", "BATTALION", "CUSTODIAN", "SAFEGUARD", "CONSTRUCT",
+    # 10-letter words
+    "DEMOLITION", "EXPERIMENT", "FILTRATION", "GOVERNMENT", "HEADQUARTS",
+    "INDUSTRIAL", "JUXTAPOSED", "KILOMETERS", "LIEUTENANT", "MERCENARIE",
+    "NEUTRALIZE", "ORDINANCES", "PARTICULAR", "QUARANTINE", "RELOCATION",
+    "SETTLEMENT", "TECHNOLOGY", "UNDERSTAND", "VENTILATED", "WATCHTOWER",
+    "BLACKSMITH", "CONTROLLER", "DEPLOYMENT", "EVACUATION", "FOOTBRIDGE",
+    "GRAVESTONE", "HORSEPOWER", "INADEQUATE", "JURISDICTION", "LEADERSHIP",
+    "MASTERWORK", "NAVIGATION", "OCCUPATION", "POWERPLANT", "RECOMMENDS",
+    "STATIONARY", "TRANSISTOR", "UNDERMINED", "VELOCITIES", "WORTHWHILE",
+]
+
+# Remove any invalid entries (must be 7-10 chars, uppercase alpha only)
+WORDS = [
+    w for w in WORDS
+    if 7 <= len(w) <= 10 and w.isalpha() and w == w.upper()
+]
+
+# Remove duplicates while preserving order
+_seen: set[str] = set()
+_unique: list[str] = []
+for _w in WORDS:
+    if _w not in _seen:
+        _seen.add(_w)
+        _unique.append(_w)
+WORDS = _unique
+del _seen, _unique
+
+
+def get_words_by_length(length: int) -> list[str]:
+    """Return all words of the given length."""
+    return [w for w in WORDS if len(w) == length]

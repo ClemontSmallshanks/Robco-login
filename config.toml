@@ -1,0 +1,33 @@
+[display]
+scheme = "green"
+uppercase = true
+crt_effects = true
+scanlines = true
+screen_flicker = true
+phosphor_glow = true
+text_defocus = 0.5
+noise = true
+curvature = true
+animation_speed = 1.0
+font_size = 18
+font_family = "monospace"
+
+[boot]
+show_animation = true
+animation_delay_ms = 50
+
+[game]
+min_word_length = 7
+max_word_length = 10
+num_candidates = 12
+initial_attempts = 4
+max_attempts = 4
+
+[audio]
+enabled = true
+volume = 0.7
+
+[system]
+development_mode = true
+mock_auth = true
+username = ""
