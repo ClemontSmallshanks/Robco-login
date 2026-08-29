@@ -57,6 +57,25 @@ class TerminalRenderer(QWidget):
             self._grid = TerminalGrid(80, 24)
         return self._grid
 
+    def set_font_size(self, size: int) -> None:
+        """Update font size and force a grid recalculation."""
+        if self._font_size == size:
+            return
+            
+        self._font_size = size
+        self._font = _get_terminal_font(self._font_size)
+        
+        fm = QFontMetrics(self._font)
+        self._char_width = fm.horizontalAdvance("A")
+        self._char_height = self._font_size + 4
+        
+        # Force recreation of grid with new dimensions
+        self._grid = None
+        
+        from PyQt6.QtGui import QResizeEvent
+        self.resizeEvent(QResizeEvent(self.size(), self.size()))
+        self.update()
+
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
         

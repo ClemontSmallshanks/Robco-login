@@ -10,5 +10,6 @@ def start_session(username: str, development_mode: bool = True) -> None:
     if development_mode:
         print(f"DEVELOPMENT MODE: Session start for user '{username}'")
         sys.exit(0)
-    # Production implementation will depend on chosen DM integration
-    raise NotImplementedError("Production session launch not implemented")
+    # In production with greetd, the GreetdAuthenticator handles session launch
+    # via IPC. greetd will tear down the greeter environment automatically.
+    pass

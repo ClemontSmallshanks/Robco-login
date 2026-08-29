@@ -45,7 +45,12 @@ class MainWindow(QMainWindow):
         if config.system.mock_auth:
             self._auth: Authenticator = MockAuthenticator()
         else:
-            self._auth = MockAuthenticator()  # fallback for now
+            try:
+                from app.auth.greetd_auth import GreetdAuthenticator
+                self._auth = GreetdAuthenticator()
+            except ImportError:
+                print("Warning: GreetdAuthenticator failed to import. Falling back to MockAuthenticator.")
+                self._auth = MockAuthenticator()
 
         # Create game state
         self._game = GameState(
@@ -129,6 +134,17 @@ class MainWindow(QMainWindow):
         if self._current_state:
             self._current_state.exit()
             
+        # Dynamically scale font ONLY for hacking minigame
+        if state_id == SCREEN_HACKING:
+            # Calculate the perfect font size to fit exactly 25 rows 
+            # (8 header rows + 17 hex dump rows) on the user's specific screen.
+            usable_h = self.height() * 0.8  # Account for 10% margins top and bottom
+            target_char_height = int(usable_h // 25)
+            font_size = max(12, target_char_height - 4)
+            self._renderer.set_font_size(font_size)
+        else:
+            self._renderer.set_font_size(self._config.display.font_size)
+            
         self._current_state = self._states.get(state_id)
         if self._current_state and self._renderer.grid:
             self._current_state.enter(self._renderer.grid)
@@ -162,23 +178,8 @@ class MainWindow(QMainWindow):
 
     def _on_login_selected(self) -> None:
         if self._game.phase == GamePhase.MENU:
-            if self._renderer.grid:
-                total_rows = self._renderer.grid.rows
-                total_cols = self._renderer.grid.cols
-                
-                # Header uses ~7 rows. Footer uses ~8 rows. We want at least 15 rows.
-                num_lines = max(10, total_rows - 16)
-                
-                # Two columns. Left and right margins = 10 cols total.
-                # Center gap = 2 cols.
-                # Address = 7 cols per column.
-                # Total fixed cols = 10 + 2 + 14 = 26.
-                avail_width = total_cols - 26
-                line_width = max(10, avail_width // 2)
-                
-                self._game.start_game(num_lines=num_lines, line_width=line_width)
-            else:
-                self._game.start_game()
+            # Strictly use the classic layout
+            self._game.start_game(num_lines=17, line_width=12)
         self._show_state(SCREEN_HACKING)
 
     def _on_return_to_menu(self) -> None:
@@ -193,7 +194,8 @@ class MainWindow(QMainWindow):
         self._show_state(SCREEN_LOCKOUT)
 
     def _on_hacking_authenticated(self) -> None:
-        start_session("user", self._dev_mode)
+        # Hacking challenge succeeded. Now require actual PAM authentication.
+        self._show_state(SCREEN_SYSTEM_LOGIN)
 
     def _on_system_login_requested(self) -> None:
         self._show_state(SCREEN_SYSTEM_LOGIN)

@@ -17,9 +17,9 @@ show_animation = true
 animation_delay_ms = 50
 
 [game]
-min_word_length = 7
-max_word_length = 10
-num_candidates = 12
+min_word_length = 12
+max_word_length = 12
+num_candidates = 16
 initial_attempts = 4
 max_attempts = 4
 

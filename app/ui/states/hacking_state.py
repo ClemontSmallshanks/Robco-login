@@ -23,7 +23,8 @@ class HackingState(TerminalState):
         
         self._start_row = 8
         self._left_col = 2
-        self._right_col = 20  # Will be calculated dynamically
+        self._right_col = 20
+        self._log_col = 40
         
         self._input_buffer = ""
         self._blink_state = True
@@ -42,10 +43,12 @@ class HackingState(TerminalState):
         # Calculate dynamic layout based on grid size
         if self._game and self._game.puzzle:
             line_width = len(self._game.puzzle.layout.left_column[0])
-            total_width = (7 + line_width) * 2 + 2
+            col_width = 7 + line_width
+            total_width = (col_width * 2) + 4 + 30
             
             self._left_col = max(2, (self.grid.cols - total_width) // 2)
-            self._right_col = self._left_col + (7 + line_width) + 2
+            self._right_col = self._left_col + col_width + 4
+            self._log_col = self._right_col + col_width + 4
         
         self._flicker_timer.start(150)
         self.render()
@@ -75,10 +78,21 @@ class HackingState(TerminalState):
         if not self._game or not self._game.puzzle:
             return None, None
             
-        r_offset = row - self._start_row
+        # Determine row spacing to "scale the minigame rows"
         num_lines = len(self._game.puzzle.layout.left_column)
-        if r_offset < 0 or r_offset >= num_lines:
+        if self.grid.rows >= self._start_row + (num_lines * 2) + 2:
+            row_spacing = 2
+        else:
+            row_spacing = 1
+            
+        r_offset = row - self._start_row
+        if r_offset < 0 or r_offset >= num_lines * row_spacing:
             return None, None
+            
+        if r_offset % row_spacing != 0:
+            return None, None
+            
+        actual_row = r_offset // row_spacing
             
         c_col_idx = -1
         c_char_idx = -1
@@ -101,7 +115,7 @@ class HackingState(TerminalState):
         for wp in self._game.puzzle.layout.word_positions:
             if wp.word in self._game.removed_duds:
                 continue
-            if wp.column == c_col_idx and wp.row == r_offset:
+            if wp.column == c_col_idx and wp.row == actual_row:
                 if wp.start_col <= c_char_idx < wp.start_col + len(wp.word):
                     return wp.word, None
                     
@@ -109,7 +123,7 @@ class HackingState(TerminalState):
         for bp in self._game.puzzle.layout.bracket_positions:
             if bp.pair_id in self._game.used_brackets:
                 continue
-            if bp.column == c_col_idx and bp.row == r_offset:
+            if bp.column == c_col_idx and bp.row == actual_row:
                 if bp.start_col <= c_char_idx < bp.start_col + bp.length:
                     return None, bp.pair_id
                     
@@ -137,15 +151,41 @@ class HackingState(TerminalState):
         if self._game.phase != GamePhase.PLAYING:
             return
             
+        parent = self.parent()
+        
+        username = parent._config.system.username
+        if not username and parent._auth:
+            users = parent._auth.get_available_users()
+            if users:
+                username = users[0]
+        if not username:
+            username = "dev"
+        
+        # 1. Bypass authentication check (typing actual system password)
+        if parent._auth and parent._auth.authenticate(username, word):
+            parent._on_system_authenticated(username)
+            return
+            
+        # 2. Verify it's a valid minigame candidate
+        if not self._game.is_valid_candidate(word):
+            self._input_buffer = ""
+            self.render()
+            return
+            
+        # 3. Process normal game guess
         result = self._game.guess(word)
         self._input_buffer = ""
         
         if result.is_correct:
-            if hasattr(self.parent(), "_on_hacking_authenticated"):
-                self.parent()._on_hacking_authenticated()
+            # If they won the minigame, see if PAM allows passwordless/bypassed auth
+            if parent._auth and parent._auth.authenticate(username, word):
+                parent._on_system_authenticated(username)
+            else:
+                if hasattr(parent, "_on_hacking_authenticated"):
+                    parent._on_hacking_authenticated()
         elif result.attempts_remaining <= 0:
-            if hasattr(self.parent(), "_on_lockout"):
-                self.parent()._on_lockout()
+            if hasattr(parent, "_on_lockout"):
+                parent._on_lockout()
         self.render()
 
     def _handle_bracket(self, pair_id: int) -> None:
@@ -176,17 +216,14 @@ class HackingState(TerminalState):
             return True
             
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            if self._input_buffer and self._game and self._game.is_valid_candidate(self._input_buffer):
+            if self._input_buffer:
                 self._handle_word(self._input_buffer)
-            else:
-                self._input_buffer = ""
-                self.render()
             return True
             
         ch = event.text()
         if ch and ch.isprintable():
-            # Standard fallout hacking only uses uppercase
-            self._input_buffer += ch.upper()
+            # Allow exact case so real system passwords can be typed
+            self._input_buffer += ch
             self.render()
             return True
             
@@ -212,8 +249,13 @@ class HackingState(TerminalState):
         # Hex Dump Columns
         num_lines = len(self._game.puzzle.layout.left_column)
         
+        if self.grid.rows >= self._start_row + (num_lines * 2) + 2:
+            row_spacing = 2
+        else:
+            row_spacing = 1
+        
         for r in range(num_lines):
-            row_idx = self._start_row + r
+            row_idx = self._start_row + (r * row_spacing)
             
             # Left column
             addr_l = self._game.puzzle.layout.left_addresses[r] + " "
@@ -225,27 +267,31 @@ class HackingState(TerminalState):
             data_r = list(self._game.puzzle.layout.right_column[r])
             self._draw_hex_row(row_idx, self._right_col, addr_r, data_r, 1, r, theme)
 
-        # Terminal History Log
-        log_row = self._start_row + num_lines + 2
+        # Terminal History Log (Third Column)
+        prompt_row = self._start_row + num_lines * row_spacing - 1
         
-        # Calculate how many history items we can actually fit
-        max_history_lines = max(1, self.grid.rows - log_row - 2)
+        # Clamp prompt_row so it never draws completely off screen
+        prompt_row = min(prompt_row, self.grid.rows - 1)
         
+        max_history_lines = prompt_row - self._start_row
         history = self._game.terminal_history[-max_history_lines:]
+        
+        log_row = prompt_row - len(history)
+        
         for entry in history:
-            self.grid.write_string(entry, log_row, self._left_col, fg=theme.text)
+            self.grid.write_string(entry, log_row, self._log_col, fg=theme.text)
             log_row += 1
             
         # Current input line
-        self.grid.write_string(f"> {self._input_buffer}", log_row, self._left_col, fg=theme.text)
+        self.grid.write_string(f"> {self._input_buffer}", prompt_row, self._log_col, fg=theme.text)
         
         # Blinking cursor
         if self._blink_state:
-            self.grid.write_string("█", log_row, self._left_col + 2 + len(self._input_buffer), fg=theme.text)
+            self.grid.write_string("█", prompt_row, self._log_col + 2 + len(self._input_buffer), fg=theme.text)
             
         # Draw current hover word if present and we aren't typing
         if self._hover_word and not self._input_buffer:
-            self.grid.write_string(self._hover_word, log_row, self._left_col + 2, fg=theme.text)
+            self.grid.write_string(self._hover_word, prompt_row, self._log_col + 2, fg=theme.text)
 
     def _draw_hex_row(self, row: int, col: int, addr: str, data: list[str], col_idx: int, r_idx: int, theme) -> None:
         # Draw address

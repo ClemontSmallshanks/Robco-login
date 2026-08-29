@@ -29,7 +29,8 @@ class MockAuthenticator(Authenticator):
     MOCK_PASSWORD = "dev"
 
     def authenticate(self, username: str, password: str) -> bool:
-        return username == self.MOCK_USER and password == self.MOCK_PASSWORD
+        # In mock mode, any password is valid to allow the minigame bypass to succeed.
+        return True
 
     def get_available_users(self) -> list[str]:
         return [self.MOCK_USER]

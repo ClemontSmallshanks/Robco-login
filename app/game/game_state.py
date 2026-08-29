@@ -135,13 +135,10 @@ class GameState:
         if self._phase != GamePhase.MENU:
             raise RuntimeError(f"Cannot start game from phase {self._phase}")
             
-        # Scale candidates dynamically but keep it somewhat sane
-        dynamic_candidates = min(25, max(12, int(num_lines * 0.8)))
-
         self._puzzle = generate_puzzle(
             min_word_length=self._min_word_length,
             max_word_length=self._max_word_length,
-            num_candidates=dynamic_candidates,
+            num_candidates=self._num_candidates,
             num_lines=num_lines,
             line_width=line_width,
         )
@@ -219,6 +216,19 @@ class GameState:
         if pair_id in self._used_brackets:
             return None
 
+        # Record the bracket text in terminal history
+        bracket_str = ""
+        if self._puzzle:
+            for bp in self._puzzle.layout.bracket_positions:
+                if bp.pair_id == pair_id:
+                    if bp.column == 0:
+                        bracket_str = self._puzzle.layout.left_column[bp.row][bp.start_col:bp.start_col+bp.length]
+                    else:
+                        bracket_str = self._puzzle.layout.right_column[bp.row][bp.start_col:bp.start_col+bp.length]
+                    break
+        if bracket_str:
+            self._terminal_history.append(f"> {bracket_str}")
+
         self._used_brackets.add(pair_id)
         effect = choose_bracket_effect()
 
@@ -232,20 +242,20 @@ class GameState:
                 self._attempts_remaining = apply_allowance_replenishment(
                     self._attempts_remaining, self._max_attempts
                 )
-                self._terminal_history.append("> ALLOWANCE REPLENISHED")
+                self._terminal_history.append("> Allowance replenished.")
                 return BracketResult(
                     effect=effect,
                     new_attempts=self._attempts_remaining,
                 )
             
-            self._terminal_history.append("> DUD REMOVED.")
+            self._terminal_history.append("> Dud removed.")
             return BracketResult(effect=effect, removed_word=removed)
 
         elif effect == BracketEffect.ALLOWANCE_REPLENISHED:
             self._attempts_remaining = apply_allowance_replenishment(
                 self._attempts_remaining, self._max_attempts
             )
-            self._terminal_history.append("> ALLOWANCE REPLENISHED")
+            self._terminal_history.append("> Allowance replenished.")
             return BracketResult(
                 effect=effect,
                 new_attempts=self._attempts_remaining,

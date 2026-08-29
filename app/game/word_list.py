@@ -54,12 +54,18 @@ WORDS: list[str] = [
     "GRAVESTONE", "HORSEPOWER", "INADEQUATE", "JURISDICTION", "LEADERSHIP",
     "MASTERWORK", "NAVIGATION", "OCCUPATION", "POWERPLANT", "RECOMMENDS",
     "STATIONARY", "TRANSISTOR", "UNDERMINED", "VELOCITIES", "WORTHWHILE",
+    # 12-letter words
+    "TRANSMISSION", "ARCHITECTURE", "INTERFERENCE", "AUTHENTICATE",
+    "MANIPULATING", "HYDRODYNAMIC", "CONSTRUCTION", "ELECTROMAGNET",
+    "RADIOISOTOPE", "THERMOMETERS", "APPREHENSION", "CATASTROPHIC",
+    "CIRCUMSTANCE", "DIFFERENTIAL", "FLUCTUATIONS", "INSTALLATION",
+    "NEUTRALIZING", "OBSERVATIONS", "PURIFICATION", "RECALIBRATED",
 ]
 
-# Remove any invalid entries (must be 7-10 chars, uppercase alpha only)
+# Remove any invalid entries (must be 7-12 chars, uppercase alpha only)
 WORDS = [
     w for w in WORDS
-    if 7 <= len(w) <= 10 and w.isalpha() and w == w.upper()
+    if 7 <= len(w) <= 12 and w.isalpha() and w == w.upper()
 ]
 
 # Remove duplicates while preserving order
