@@ -1,9 +1,6 @@
 # RobCo Greeter
 
-A highly immersive, Fallout-inspired terminal login screen (greeter) for Wayland systems. 
-
-Built on top of `greetd` and `cage`, this greeter forces you to interact with a classic RobCo Industries terminal to authenticate and launch your desktop environment (such as Plasma Wayland). It features the iconic hacking minigame which can be configured to act as an authentic bypass to your Linux session.
-
+Hey folks, so this is replica of the hacking minigame from Fallout. Of course, you don't have to play the minigame, you can just enter your actual password and enter your system directly. It's a fun addition to my system lol. I have attached several screenshots of what it looks like while I was working on it. Also, I have only played New Vegas, so this minigame might be different on other fallout games, but I don't know about that. Cheers!!
 ---
 
 ## Installation
