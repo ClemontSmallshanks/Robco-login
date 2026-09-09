@@ -95,12 +95,19 @@ class LoginState(TerminalState):
 
         success = False
         if self._auth:
+            import time
+            t_ui0 = time.perf_counter()
+            print(f"[DIAG-TIME] {t_ui0:.6f} (+0.000000s) [0] UI submitting password to _auth.authenticate()", flush=True)
             success = self._auth.authenticate(self._username, self._password)
+            t_ui1 = time.perf_counter()
+            print(f"[DIAG-TIME] {t_ui1:.6f} (+{t_ui1-t_ui0:.6f}s) [10] _auth.authenticate() returned {success}", flush=True)
 
         if success:
             self._status_message = "> ACCESS GRANTED"
             self._status_color = "accent"
             self.render()
+            t_ui_render = time.perf_counter()
+            print(f"[DIAG-TIME] {t_ui_render:.6f} [11] UI rendered ACCESS GRANTED, starting 1000ms timer", flush=True)
             QTimer.singleShot(1000, self._on_success)
         else:
             self._status_message = "> ACCESS DENIED - INVALID CREDENTIALS"
@@ -112,6 +119,8 @@ class LoginState(TerminalState):
             QTimer.singleShot(3000, self._end_cooldown)
 
     def _on_success(self) -> None:
+        import time
+        print(f"[DIAG-TIME] {time.perf_counter():.6f} [12] 1000ms UI timer fired, calling parent _on_system_authenticated", flush=True)
         if hasattr(self.parent(), "_on_system_authenticated"):
             self.parent()._on_system_authenticated(self._username)
 

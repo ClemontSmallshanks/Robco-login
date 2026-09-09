@@ -87,7 +87,6 @@ class MainWindow(QMainWindow):
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
             )
-            self.setCursor(Qt.CursorShape.BlankCursor)
             self.showFullScreen()
 
         # Start sequence
@@ -177,9 +176,13 @@ class MainWindow(QMainWindow):
                 self._renderer.update()
 
     def _on_login_selected(self) -> None:
+        print(f"DIAGNOSTIC [main_window.py]: _on_login_selected() called.")
         if self._game.phase == GamePhase.MENU:
+            print(f"DIAGNOSTIC [main_window.py]: Attempts immediately BEFORE start_game(): {self._game.attempts_remaining}")
             # Strictly use the classic layout
             self._game.start_game(num_lines=17, line_width=12)
+            print(f"DIAGNOSTIC [main_window.py]: Attempts immediately AFTER start_game(): {self._game.attempts_remaining}")
+        print(f"DIAGNOSTIC [main_window.py]: Transitioning state into HackingState.")
         self._show_state(SCREEN_HACKING)
 
     def _on_return_to_menu(self) -> None:

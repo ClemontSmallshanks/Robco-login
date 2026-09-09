@@ -56,6 +56,7 @@ class GameState:
         max_word_length: int = 10,
         num_candidates: int = 12,
     ) -> None:
+        print(f"DIAGNOSTIC [game_state.py]: GameState constructed with initial_attempts={initial_attempts}")
         self._initial_attempts = initial_attempts
         self._max_attempts = max_attempts
         self._min_word_length = min_word_length
@@ -142,7 +143,9 @@ class GameState:
             num_lines=num_lines,
             line_width=line_width,
         )
+        print(f"DIAGNOSTIC [game_state.py]: _attempts_remaining immediately before reset in start_game() = {self._attempts_remaining}")
         self._attempts_remaining = self._initial_attempts
+        print(f"DIAGNOSTIC [game_state.py]: _attempts_remaining immediately after reset in start_game() = {self._attempts_remaining}")
         self._removed_duds.clear()
         self._used_brackets.clear()
         self._guess_history.clear()
@@ -156,6 +159,7 @@ class GameState:
 
     def force_lockout(self) -> None:
         """Force lockout (e.g., loaded from persistence)."""
+        print(f"DIAGNOSTIC [game_state.py]: GamePhase.LOCKOUT assigned inside force_lockout()")
         self._phase = GamePhase.LOCKOUT
 
     # --- Game actions ---
@@ -166,6 +170,7 @@ class GameState:
         Returns a GuessResult. Consumes one attempt if incorrect.
         Raises RuntimeError if not in PLAYING phase.
         """
+        print(f"DIAGNOSTIC [game_state.py]: guess() invoked with word='{word}'")
         if self._phase != GamePhase.PLAYING:
             raise RuntimeError(f"Cannot guess in phase {self._phase}")
 
@@ -178,12 +183,15 @@ class GameState:
         likeness = calculate_likeness(word, self.correct_password)
         is_correct = (word == self.correct_password)
 
+        print(f"DIAGNOSTIC [game_state.py]: _attempts_remaining BEFORE legitimate guess = {self._attempts_remaining}")
         if is_correct:
             self._phase = GamePhase.AUTHENTICATED
         else:
             self._attempts_remaining -= 1
             if self._attempts_remaining <= 0:
+                print(f"DIAGNOSTIC [game_state.py]: GamePhase.LOCKOUT assigned inside guess()")
                 self._phase = GamePhase.LOCKOUT
+        print(f"DIAGNOSTIC [game_state.py]: _attempts_remaining AFTER legitimate guess = {self._attempts_remaining}")
 
         result = GuessResult(
             word=word,
@@ -198,7 +206,9 @@ class GameState:
         self._terminal_history.append(f"> {word}")
         if is_correct:
             self._terminal_history.append("EXACT MATCH!")
-            self._terminal_history.append("PLEASE WAIT - WHILE SYSTEM IS ACCESSED")
+            self._terminal_history.append("PLEASE WAIT")
+            self._terminal_history.append("WHILE SYSTEM")
+            self._terminal_history.append("IS ACCESSED")
         else:
             self._terminal_history.append("ENTRY DENIED")
             self._terminal_history.append(f"LIKENESS={likeness}/{len(self.correct_password)}")

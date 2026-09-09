@@ -4,6 +4,7 @@ import os
 import json
 import socket
 import struct
+import time
 from typing import Optional
 
 from app.auth.authenticator import Authenticator
@@ -46,23 +47,31 @@ class GreetdAuthenticator(Authenticator):
         This function will not return True; it will exit the greeter process as greetd takes over.
         It returns False if authentication fails.
         """
+        t0 = time.perf_counter()
+        print(f"[DIAG-TIME] {t0:.6f} (+0.000000s) [1] password submission received / authenticate() entered", flush=True)
         if not self.sock_path or not os.path.exists(self.sock_path):
-            print("ERROR: GREETD_SOCK not set or invalid. Are you running under greetd?")
+            print("ERROR: GREETD_SOCK not set or invalid. Are you running under greetd?", flush=True)
             return False
 
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
                 sock.connect(self.sock_path)
+                t1 = time.perf_counter()
+                print(f"[DIAG-TIME] {t1:.6f} (+{t1-t0:.6f}s) [3] greetd connection/socket established", flush=True)
                 
                 # 1. Create the session for the user
+                print(f"[DIAG-TIME] {t1:.6f} (+0.000000s) [4] PAM/authentication request (create_session) sending...", flush=True)
                 resp = self._send_request(sock, {
                     "type": "create_session",
                     "username": username
                 })
                 
+                t_last = time.perf_counter()
                 # greetd PAM loop
                 while resp.get("type") == "auth_message":
                     msg_type = resp.get("auth_message_type")
+                    t_loop = time.perf_counter()
+                    print(f"[DIAG-TIME] {t_loop:.6f} (+{t_loop-t_last:.6f}s) auth_message received: {msg_type}", flush=True)
                     
                     if msg_type in ("secret", "visible"):
                         # Send the password when prompted for a secret/visible input
@@ -77,31 +86,45 @@ class GreetdAuthenticator(Authenticator):
                             "response": ""
                         })
                     else:
-                        print(f"Unknown greetd auth_message_type: {msg_type}")
+                        print(f"Unknown greetd auth_message_type: {msg_type}", flush=True)
                         return False
+                    t_last = time.perf_counter()
+                
+                t_resp = time.perf_counter()
+                print(f"[DIAG-TIME] {t_resp:.6f} (+{t_resp-t_last:.6f}s) [5] authentication response received (type={resp.get('type')})", flush=True)
                 
                 # 2. Check if authentication was successful
                 if resp.get("type") == "success":
+                    t_succ = time.perf_counter()
+                    print(f"[DIAG-TIME] {t_succ:.6f} (+{t_succ-t_resp:.6f}s) [6] authentication success confirmed", flush=True)
+                    
                     # Authentication succeeded! Tell greetd to start the session.
                     # This will tear down the greeter (cage) and launch the user's session.
-                    self._send_request(sock, {
+                    print(f"[DIAG-TIME] {t_succ:.6f} (+0.000000s) [7] start_session request sending...", flush=True)
+                    resp_start = self._send_request(sock, {
                         "type": "start_session",
                         "cmd": ["startplasma-wayland"]
                     })
+                    
+                    t_start = time.perf_counter()
+                    print(f"[DIAG-TIME] {t_start:.6f} (+{t_start-t_succ:.6f}s) [8] start_session response received: {resp_start}", flush=True)
                     # We should not reach here as the session starts, but if we do, return True.
+                    
+                    t_exit = time.perf_counter()
+                    print(f"[DIAG-TIME] {t_exit:.6f} (+{t_exit-t_start:.6f}s) [9] application begins its transition/exit (returning True)", flush=True)
                     return True
                     
                 elif resp.get("type") == "error":
                     error_type = resp.get("error_type", "unknown")
                     error_desc = resp.get("description", "No description")
-                    print(f"greetd authentication error: {error_type} - {error_desc}")
+                    print(f"greetd authentication error: {error_type} - {error_desc}", flush=True)
                     return False
                 
-                print(f"Unexpected greetd response: {resp}")
+                print(f"Unexpected greetd response: {resp}", flush=True)
                 return False
                 
         except Exception as e:
-            print(f"greetd IPC error: {e}")
+            print(f"greetd IPC error: {e}", flush=True)
             return False
 
     def get_available_users(self) -> list[str]:

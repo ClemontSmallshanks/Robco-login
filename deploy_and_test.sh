@@ -36,7 +36,7 @@ cleanup() {
     
     # 3. Restore PLM
     if [ "$PLM_STOPPED" -eq 1 ]; then
-        echo "Restarting PLM..."
+        echo "Restarting original display manager..."
         sudo systemctl start display-manager.service || echo "Failed to start display-manager.service."
     fi
 
@@ -47,6 +47,12 @@ cleanup() {
             echo "ERROR: Failed to remove $PROD_DIR."
             FAIL_FLAG=1
         fi
+    fi
+    
+    # 4.5. Clean up diagnostic log
+    if [ -f "/tmp/robco-greeter-qt-diag.log" ]; then
+        echo "Removing temporary diagnostic log..."
+        sudo rm -f "/tmp/robco-greeter-qt-diag.log"
     fi
 
     # 5. Verification Check
@@ -63,9 +69,9 @@ cleanup() {
     
     # Check PLM
     if systemctl is-active --quiet display-manager.service; then
-        echo "[OK] PLM is active."
+        echo "[OK] Original display manager is active."
     else
-        echo "[FAIL] PLM failed to activate!"
+        echo "[FAIL] Original display manager failed to activate!"
         FAIL_FLAG=1
     fi
     
@@ -86,7 +92,6 @@ cleanup() {
         echo "[OK] Temporary production directory state restored."
     fi
     
-    # Output manual recovery commands if any failure
     if [ -n "$FAIL_FLAG" ]; then
         echo "=========================================================="
         echo "CRITICAL WARNING: Cleanup encountered an error."
@@ -111,13 +116,17 @@ trap cleanup EXIT INT TERM
 
 echo "[1/10] Recording current display-manager state..."
 ORIGINAL_DM_TARGET=$(readlink -f /etc/systemd/system/display-manager.service || echo "")
-if [ -z "$ORIGINAL_DM_TARGET" ] || [[ ! "$ORIGINAL_DM_TARGET" == *plasmalogin.service* ]]; then
-    echo "ERROR: display-manager.service does not point to plasmalogin. Target is: $ORIGINAL_DM_TARGET"
+if [ -z "$ORIGINAL_DM_TARGET" ]; then
+    echo "ERROR: display-manager.service is not configured."
     exit 1
 fi
 echo "Original DM Target recorded: $ORIGINAL_DM_TARGET"
 
 echo "[2/10] Verifying prerequisites..."
+if ! systemctl is-active --quiet display-manager.service; then
+    echo "ERROR: Existing display manager is NOT active. We only test when it is running."
+    exit 1
+fi
 if ! id greetd >/dev/null 2>&1; then
     echo "ERROR: 'greetd' user does not exist."
     exit 1
@@ -134,11 +143,19 @@ if [ ! -f /etc/pam.d/greetd ]; then
     echo "ERROR: /etc/pam.d/greetd does not exist. PAM configuration is missing."
     exit 1
 fi
+
+DEV_DIR="$(pwd)"
+if [ ! -f "$DEV_DIR/app/main.py" ]; then
+    echo "ERROR: Application repository incomplete (app/main.py missing)."
+    exit 1
+fi
+if [ ! -f "$DEV_DIR/requirements.txt" ]; then
+    echo "ERROR: requirements.txt missing."
+    exit 1
+fi
 echo "Prerequisites met."
 
 echo "[3/10] Deploying production files and dedicated venv..."
-DEV_DIR="$(pwd)"
-
 if [ -d "$PROD_DIR" ]; then
     echo "ERROR: $PROD_DIR already exists! Aborting to prevent overwriting existing data."
     exit 1
@@ -147,78 +164,80 @@ fi
 sudo mkdir -p "$PROD_DIR"
 CREATED_PROD_DIR=1
 
-# Copy files
 sudo cp -a "$DEV_DIR/." "$PROD_DIR/"
 
-# Create venv and install dependencies
+# Disable development settings in config.toml for production realism
+if [ -f "$PROD_DIR/config.toml" ]; then
+    sudo sed -i 's/mock_auth = true/mock_auth = false/g' "$PROD_DIR/config.toml"
+    sudo sed -i 's/development_mode = true/development_mode = false/g' "$PROD_DIR/config.toml"
+fi
+
+if [ ! -f "$PROD_DIR/app/main.py" ]; then
+    echo "ERROR: Production entry point failed to copy."
+    exit 1
+fi
+
 echo "Creating virtual environment in $PROD_DIR/venv..."
 sudo python3 -m venv "$PROD_DIR/venv"
 echo "Installing dependencies..."
 sudo "$PROD_DIR/venv/bin/pip" install -q -r "$PROD_DIR/requirements.txt"
-# Record exactly what versions were resolved from PyPI
 sudo "$PROD_DIR/venv/bin/pip" freeze | sudo tee "$PROD_DIR/installed_versions.txt" >/dev/null
 
 # Apply strictly scoped permissions
 sudo chown -R root:root "$PROD_DIR"
-# Dirs to 755
 sudo find "$PROD_DIR" -type d -exec chmod 755 {} \;
-# Executable files (like venv/bin/*) to 755
 sudo find "$PROD_DIR" -type f -executable -exec chmod 755 {} \;
-# Non-executable files to 644
 sudo find "$PROD_DIR" -type f ! -executable -exec chmod 644 {} \;
-# ELF/shared-library files must be explicitly 755
 sudo find "$PROD_DIR" -type f -name "*.so" -exec chmod 755 {} \;
 sudo find "$PROD_DIR" -type f -name "*.so.*" -exec chmod 755 {} \;
 
-# Fix SELinux contexts for the deployment directory
-echo "Relabeling SELinux contexts for $PROD_DIR..."
+# Fix SELinux contexts
 sudo restorecon -Rv "$PROD_DIR" >/dev/null
 
-echo "Verifying shared library permissions as 'greetd'..."
+echo "Verifying shared library permissions and imports as 'greetd'..."
 sudo -u greetd bash -c "
-echo 'Checking QtWidgets.abi3.so permissions:'
-find $PROD_DIR/venv -name 'QtWidgets.abi3.so' -exec ls -l {} \;
-echo 'Checking libqwayland-generic.so permissions:'
-find $PROD_DIR/venv -name 'libqwayland-generic.so' -exec ls -l {} \;
-
-echo 'Verifying QtWidgets import after permission lockdown...'
 cd $PROD_DIR && venv/bin/python3 -c 'import PyQt6.QtWidgets' || { echo 'ERROR: PyQt6.QtWidgets import failed!'; exit 1; }
-echo 'PyQt6.QtWidgets imported successfully!'
 " || exit 1
 
-echo "[3b/10] Running Isolated Qt Wayland Plugin Load Test..."
+echo "[3b/10] Verifying noexec constraints..."
+# Test execution of the python binary to ensure noexec is not set on /usr/local/lib
+if ! sudo -u greetd "$PROD_DIR/venv/bin/python3" --version >/dev/null 2>&1; then
+    echo "ERROR: Cannot execute python in $PROD_DIR. Check if partition is mounted with noexec."
+    exit 1
+fi
+
+echo "[4/10] Running Isolated Qt Wayland Plugin Load Test as 'greetd' user..."
 sudo -u greetd bash -c "cd $PROD_DIR && \
 export QT_QPA_PLATFORM=wayland && \
 export QT_DEBUG_PLUGINS=1 && \
-echo '--- Isolated Qt Wayland Plugin Load Test ---' > qt_wayland_diag.log && \
+DIAG_LOG='/tmp/robco-greeter-qt-diag.log' && \
+echo '--- Isolated Qt Wayland Plugin Load Test ---' > \$DIAG_LOG && \
 timeout 10 venv/bin/python3 -c '
 import sys
 from PyQt6.QtWidgets import QApplication
 app = QApplication(sys.argv)
 print(\"QApplication initialized successfully\")
-' >> qt_wayland_diag.log 2>&1
+' >> \$DIAG_LOG 2>&1
 APP_EXIT_CODE=\$?
 
 if [ \$APP_EXIT_CODE -eq 124 ]; then
-    echo 'Wayland load test reached 10-second timeout (expected if waiting indefinitely for display)' >> qt_wayland_diag.log
+    echo 'Wayland load test reached 10-second timeout (expected if waiting indefinitely for display)' >> \$DIAG_LOG
 elif [ \$APP_EXIT_CODE -eq 0 ]; then
-    echo 'QApplication initialized successfully (exit code 0)' >> qt_wayland_diag.log
+    echo 'QApplication initialized successfully (exit code 0)' >> \$DIAG_LOG
 else
-    echo \"QApplication failed to initialize (exit code \$APP_EXIT_CODE)\" >> qt_wayland_diag.log
+    echo \"QApplication failed to initialize (exit code \$APP_EXIT_CODE)\" >> \$DIAG_LOG
+    # It is expected to abort (exit code 134) when there is no Wayland display active.
+    # We only care if it failed due to missing shared libraries.
 fi
 
-echo \"\"
-echo \"=== WAYLAND PLUGIN DIAGNOSTIC LOG ===\"
-cat qt_wayland_diag.log
-echo \"=====================================\"
-
-if grep -q \"not found\" qt_wayland_diag.log || grep -q \"Cannot load library\" qt_wayland_diag.log; then
+if grep -q \"not found\" \$DIAG_LOG || grep -q \"Cannot load library\" \$DIAG_LOG; then
     echo \"ERROR: Missing shared libraries detected in Wayland plugin load test!\"
+    cat \$DIAG_LOG
     exit 1
 fi
-" || { echo "ERROR: Wayland plugin load test failed due to missing libraries."; exit 1; }
+" || { echo "ERROR: Wayland plugin load test failed."; exit 1; }
 
-echo "[4/10] Backing up and configuring greetd..."
+echo "[5/10] Backing up and configuring greetd..."
 sudo mkdir -p /etc/greetd
 GREETD_CONFIG_BACKUP=$(mktemp)
 if [ -f /etc/greetd/config.toml ]; then
@@ -232,80 +251,17 @@ cat <<EOF | sudo tee /etc/greetd/config.toml >/dev/null
 vt = 1
 
 [default_session]
-command = "cage -s -- bash -c 'cd /usr/local/lib/robco-greeter && venv/bin/python3 -m app.main'"
+command = "cage -s -- bash -c 'cd /usr/local/lib/robco-greeter && export PYTHONUNBUFFERED=1 && venv/bin/python3 -m app.main >> /tmp/robco-greeter.log 2>&1'"
 user = "greetd"
 EOF
-
-echo "[5/10] Running Deep Qt Wayland Diagnostics as 'greetd' user..."
-# Run diagnostic script using the unprivileged greetd user and the venv interpreter
-sudo -u greetd bash -c "cd $PROD_DIR && \
-export QT_DEBUG_PLUGINS=1 && \
-export QT_QPA_PLATFORM=wayland && \
-echo '--- Python & PyQt Versions ---' > qt_diag.log && \
-venv/bin/python3 -c '
-import sys
-import PyQt6.QtCore as QtCore
-import os
-print(f\"Interpreter Path: {sys.executable}\")
-print(f\"Python Version: {sys.version.split()[0]}\")
-print(f\"PyQt6 Version: {QtCore.PYQT_VERSION_STR}\")
-print(f\"Qt Version: {QtCore.QT_VERSION_STR}\")
-pyqt_dir = os.path.dirname(QtCore.__file__)
-print(f\"PyQt6 Directory: {pyqt_dir}\")
-' >> qt_diag.log 2>&1
-
-echo '--- Locating Qt Plugins ---' >> qt_diag.log
-PLUGIN_DIR=\$(venv/bin/python3 -c 'import os, PyQt6.QtCore as c; print(os.path.join(os.path.dirname(c.__file__), \"Qt6\", \"plugins\", \"platforms\"))')
-echo \"Plugin directory: \$PLUGIN_DIR\" >> qt_diag.log
-
-echo '--- LDD Output for Platform Plugins ---' >> qt_diag.log
-if [ -d \"\$PLUGIN_DIR\" ]; then
-    for p in \"\$PLUGIN_DIR\"/*.so; do
-        echo \"Plugin: \$p\" >> qt_diag.log
-        ldd \"\$p\" >> qt_diag.log 2>&1 || true
-    done
-else
-    echo \"WARNING: Plugin directory not found!\" >> qt_diag.log
-fi
-
-echo '--- Testing Explicit Wayland Plugin Load ---' >> qt_diag.log
-# Time-bounded QPA plugin initialization test
-timeout 10 venv/bin/python3 -c '
-import sys
-from PyQt6.QtWidgets import QApplication
-app = QApplication(sys.argv)
-print(\"QApplication initialized successfully\")
-' >> qt_diag.log 2>&1
-APP_EXIT_CODE=\$?
-
-if [ \$APP_EXIT_CODE -eq 124 ]; then
-    echo 'Wayland load test reached 10-second timeout (expected if waiting indefinitely for display)' >> qt_diag.log
-elif [ \$APP_EXIT_CODE -eq 0 ]; then
-    echo 'QApplication initialized successfully (exit code 0)' >> qt_diag.log
-else
-    echo \"QApplication failed to initialize (exit code \$APP_EXIT_CODE)\" >> qt_diag.log
-fi
-
-echo \"\"
-echo \"=== COMPLETE DIAGNOSTIC LOG ===\"
-cat qt_diag.log
-echo \"===============================\"
-
-# Check for missing shared libraries
-if grep -q \"not found\" qt_diag.log || grep -q \"Cannot load library\" qt_diag.log; then
-    echo \"ERROR: Missing shared libraries detected in Qt plugins or ldd output!\"
-    exit 1
-fi
-" || { echo "ERROR: Qt Diagnostic detected missing libraries or failed."; exit 1; }
 
 echo "=========================================================="
 echo "                   STAGING COMPLETE                       "
 echo "=========================================================="
 echo "The system is ready for the controlled graphical test."
-echo "This test is isolated and reversible."
 echo "=========================================================="
 
-echo "[6/10] Stopping PLM and starting greetd..."
+echo "[6/10] Stopping original display manager and starting greetd..."
 if sudo systemctl stop display-manager.service; then
     PLM_STOPPED=1
 else
@@ -313,6 +269,7 @@ else
     exit 1
 fi
 
+sudo rm -f /tmp/robco-greeter.log
 sudo systemctl start greetd.service
 
 # Verify greetd is active immediately
@@ -321,10 +278,6 @@ if ! sudo systemctl is-active --quiet greetd.service; then
     sudo journalctl -u greetd.service -n 100 --no-pager
     exit 1
 fi
-
-# Print additional diagnostics
-systemctl status greetd.service --no-pager
-sudo journalctl -u greetd.service -n 50 --no-pager
 
 echo ""
 echo "TEST IS RUNNING ON TTY1."
@@ -338,5 +291,10 @@ read -p "Return to TTY3 and press ENTER when testing is complete..."
 echo "[7/10] Capturing logs for greetd..."
 sudo journalctl -b 0 -u greetd.service --no-pager > greetd-test-session.log
 echo "Logs saved to: greetd-test-session.log"
+if [ -f /tmp/robco-greeter.log ]; then
+    sudo cp /tmp/robco-greeter.log ./robco-greeter-app.log
+    sudo chown $USER:$USER ./robco-greeter-app.log
+    echo "App logs saved to: robco-greeter-app.log"
+fi
 
-# Cleanup will handle restoration
+# Cleanup handles restoration

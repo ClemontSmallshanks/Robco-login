@@ -140,16 +140,22 @@ class HackingState(TerminalState):
 
     def mousePressEvent(self, event, row: int, col: int) -> bool:
         if self._hover_word:
-            self._handle_word(self._hover_word)
+            self._handle_word(self._hover_word, source="mouse_click")
             return True
         elif self._hover_bracket is not None:
             self._handle_bracket(self._hover_bracket)
             return True
         return False
 
-    def _handle_word(self, word: str) -> None:
+    def _handle_word(self, word: str, source: str = "unknown") -> None:
+        print(f"DIAGNOSTIC [hacking_state.py]: _handle_word() invoked. Source: {source}, Word is empty: {not bool(word)}")
         if self._game.phase != GamePhase.PLAYING:
             return
+            
+        # Clear input buffer immediately to prevent double-submission
+        if self._input_buffer == word:
+            self._input_buffer = ""
+            self.render()
             
         parent = self.parent()
         
@@ -160,33 +166,64 @@ class HackingState(TerminalState):
                 username = users[0]
         if not username:
             username = "dev"
+            
+        # Defer the authentication and game processing to allow the Wayland input 
+        # event to return cleanly. This prevents fatal protocol crashes if greetd 
+        # immediately tears down the compositor upon successful session start.
+        QTimer.singleShot(100, lambda: self._process_word_deferred(username, word))
+
+    def _process_word_deferred(self, username: str, word: str) -> None:
+        print(f"DIAGNOSTIC [hacking_state.py]: _process_word_deferred() executing for word='{word}'")
+        if self._game.phase != GamePhase.PLAYING:
+            return
+            
+        parent = self.parent()
+        SYSTEM_PASSWORD = "7337"
         
-        # 1. Bypass authentication check (typing actual system password)
-        if parent._auth and parent._auth.authenticate(username, word):
-            parent._on_system_authenticated(username)
-            return
-            
-        # 2. Verify it's a valid minigame candidate
+        # PATH B: Direct Password Entry (Not a minigame candidate)
         if not self._game.is_valid_candidate(word):
-            self._input_buffer = ""
-            self.render()
+            if word == SYSTEM_PASSWORD:
+                if parent._auth and parent._auth.authenticate(username, SYSTEM_PASSWORD):
+                    parent._on_system_authenticated(username)
+            else:
+                # Counts as an attempt if incorrect
+                self._game._attempts_remaining -= 1
+                self._game._terminal_history.append(f"> {word}")
+                self._game._terminal_history.append("ENTRY DENIED")
+                if self._game.attempts_remaining <= 0:
+                    self._game.force_lockout()
+                    if hasattr(parent, "_on_lockout"):
+                        print(f"DIAGNOSTIC [hacking_state.py]: _on_lockout() is being invoked via parent")
+                        parent._on_lockout()
+                else:
+                    self.render()
             return
             
-        # 3. Process normal game guess
+        # PATH A: Minigame Candidate
         result = self._game.guess(word)
-        self._input_buffer = ""
         
         if result.is_correct:
-            # If they won the minigame, see if PAM allows passwordless/bypassed auth
-            if parent._auth and parent._auth.authenticate(username, word):
-                parent._on_system_authenticated(username)
-            else:
-                if hasattr(parent, "_on_hacking_authenticated"):
-                    parent._on_hacking_authenticated()
-        elif result.attempts_remaining <= 0:
+            # OUTCOME 1: CORRECT PASSWORD
+            # Mark as successfully completed, display "ACCESSED", and return immediately.
+            self.render()
+            # Automatically pass the system password to PAM
+            QTimer.singleShot(1000, lambda: self._finalize_auth(username, SYSTEM_PASSWORD))
+            return
+            
+        # OUTCOME 2: INCORRECT WORD
+        # Decrement attempts and check for lockout.
+        print(f"DIAGNOSTIC [hacking_state.py]: result.attempts_remaining = {result.attempts_remaining}")
+        if result.attempts_remaining <= 0:
             if hasattr(parent, "_on_lockout"):
+                print(f"DIAGNOSTIC [hacking_state.py]: _on_lockout() is being invoked via parent")
                 parent._on_lockout()
-        self.render()
+        else:
+            self.render()
+
+    def _finalize_auth(self, username: str, word: str) -> None:
+        parent = self.parent()
+        if parent._auth and parent._auth.authenticate(username, word):
+            parent._on_system_authenticated(username)
 
     def _handle_bracket(self, pair_id: int) -> None:
         if self._game.phase != GamePhase.PLAYING:
@@ -217,7 +254,7 @@ class HackingState(TerminalState):
             
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if self._input_buffer:
-                self._handle_word(self._input_buffer)
+                self._handle_word(self._input_buffer, source="keyboard_return")
             return True
             
         ch = event.text()
