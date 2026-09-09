@@ -44,3 +44,12 @@ secrets/
 
 # RobCo runtime state
 robco-greeter-lockout
+
+# Development screenshots
+screenshot_*.png
+
+# Local diagnostics
+diag.txt
+greetd-test-session.log
+robco-greeter-app.log
+qt_wayland_diag.log
