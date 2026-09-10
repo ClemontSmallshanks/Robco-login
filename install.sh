@@ -48,6 +48,20 @@ fi
 mkdir -p "$PROD_DIR"
 cp -a "$DEV_DIR/." "$PROD_DIR/"
 
+# Prompt user for their password:
+echo "Please enter your password for your account (password will be encrypted)"
+read USERPASS
+
+echo "Creating encryption keys"
+SALT=$(openssl rand -hex 16)
+IV=$(openssl rand -hex 16)
+
+echo "Storing keys and encrypted password"
+ENCRYPTED_PASS=$(python ./encrypt_pass.py $USERPASS $SALT $IV)
+sed -i 's/REPLACESALT/'${salt}'/' ./app/auth/hacking_state.py
+sed -i 's/REPLACESIV/'${iv}'/' ./app/auth/hacking_state.py
+sed -i 's/REPLACEPASS/'${ENCRYPTED_PASS}'/' ./app/auth/hacking_state.py
+
 # Disable development settings in config.toml for production realism
 if [ -f "$PROD_DIR/config.toml" ]; then
     sed -i 's/mock_auth = true/mock_auth = false/g' "$PROD_DIR/config.toml"
