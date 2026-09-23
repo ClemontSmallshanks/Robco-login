@@ -178,7 +178,9 @@ else
 fi
 
 ORIGINAL_DM_TARGET=$(readlink -f /etc/systemd/system/display-manager.service || echo "")
-if [ -n "$ORIGINAL_DM_TARGET" ]; then
+if [[ "$ORIGINAL_DM_TARGET" == *"greetd.service"* ]] && [ -f /etc/greetd/original_dm_target.txt ]; then
+    cat /etc/greetd/original_dm_target.txt > "$DM_SERVICE_BAK"
+elif [ -n "$ORIGINAL_DM_TARGET" ]; then
     echo "$ORIGINAL_DM_TARGET" > "$DM_SERVICE_BAK"
 else
     touch "$DM_SERVICE_BAK"

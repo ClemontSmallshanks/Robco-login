@@ -23,6 +23,16 @@ systemctl disable greetd.service || echo "Failed to disable greetd."
 echo "[3/9] Restoring original display-manager target..."
 if [ -f "$ORIGINAL_DM_FILE" ]; then
     ORIGINAL_DM_TARGET=$(cat "$ORIGINAL_DM_FILE")
+    if [[ "$ORIGINAL_DM_TARGET" == *"greetd.service"* ]] || [ -z "$ORIGINAL_DM_TARGET" ]; then
+        echo "WARNING: Original DM target points to greetd. Auto-detecting true display manager..."
+        if [ -f /usr/lib/systemd/system/plasmalogin.service ]; then
+            ORIGINAL_DM_TARGET="/usr/lib/systemd/system/plasmalogin.service"
+        elif [ -f /usr/lib/systemd/system/sddm.service ]; then
+            ORIGINAL_DM_TARGET="/usr/lib/systemd/system/sddm.service"
+        elif [ -f /usr/lib/systemd/system/gdm.service ]; then
+            ORIGINAL_DM_TARGET="/usr/lib/systemd/system/gdm.service"
+        fi
+    fi
     if [ -n "$ORIGINAL_DM_TARGET" ]; then
         echo "Restoring display-manager.service to $ORIGINAL_DM_TARGET..."
         ln -sf "$ORIGINAL_DM_TARGET" /etc/systemd/system/display-manager.service
