@@ -178,49 +178,30 @@ class HackingState(TerminalState):
         # immediately tears down the compositor upon successful session start.
         QTimer.singleShot(100, lambda: self._process_word_deferred(username, word))
 
-    def get_machine_id() -> str:
+    def _get_machine_id(self) -> str:
         """Read the Linux system's unique machine ID."""
         with open("/etc/machine-id", "r") as f:
             return f.read().strip()
 
-
-    def derive_key(password: str, salt: bytes) -> bytes:
-        """Derive a 256-bit key from the password using PBKDF2."""
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,  # 256 bits
-            salt=salt,
-            iterations=390000,
-        )
-        return kdf.derive(password.encode())
-
-
-    def decrypt(ciphertext_b64: str, salt: bytes, iv: bytes, password: str) -> str:
-        """Decrypt a base64-encoded AES-256-CBC ciphertext."""
-        key = derive_key(password, salt)
-        ciphertext = base64.b64decode(ciphertext_b64)
-
-        cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-
-        unpadder = padding.PKCS7(algorithms.AES.block_size).unpadder()
-        plaintext = unpadder.update(padded_plaintext) + unpadder.unpadder_finalize() if False else (unpadder.update(padded_plaintext) + unpadder.finalize())
-
-        return plaintext.decode()
+    def _decrypt_system_password(self) -> str:
+        from app.auth.decrypt_pass import decrypt_credential
+        cred_path = "/usr/local/lib/robco-greeter/credentials.enc"
+        machine_id = self._get_machine_id()
+        return decrypt_credential(cred_path, machine_id)
 
     def _process_word_deferred(self, username: str, word: str) -> None:
-        print(f"DIAGNOSTIC [hacking_state.py]: _process_word_deferred() executing for word='{word}'")
         if self._game.phase != GamePhase.PLAYING:
             return
             
         parent = self.parent()
-        ENCRYPTED_PASSWORD = "REPLACEPASS"
-        machine_id = get_machine_id() # Grab machine ID
-        salt = bytes.fromhex("REPLACESALT") # Salt calculated at install time
-        iv = bytes.fromhex("REPLACEIV") # IV calculated at install time
-        SYSTEM_PASSWORD = decrypt(ENCRYPTED_PASSWORD, salt, iv, machine_id) # Decrypt the user password.
         
+        try:
+            SYSTEM_PASSWORD = self._decrypt_system_password()
+        except Exception as e:
+            print(f"DIAGNOSTIC [hacking_state.py]: Failed to decrypt password: {e}")
+            # Fail closed.
+            return
+
         # PATH B: Direct Password Entry (Not a minigame candidate)
         if not self._game.is_valid_candidate(word):
             if word == SYSTEM_PASSWORD:

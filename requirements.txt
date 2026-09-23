@@ -1,3 +1,4 @@
 PyQt6>=6.5
 python-pam>=2.0
 pytest>=7.0
+cryptography>=41.0.0
