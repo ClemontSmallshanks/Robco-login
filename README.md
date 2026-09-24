@@ -4,6 +4,20 @@ Hey folks, so this is replica of the hacking minigame from Fallout. Of course, y
 
 ---
 
+## Operating System Support
+
+### Native Fedora Support
+The primary development environment is Fedora Linux. The primary installer (`./install.sh`) is fully supported and tested natively on Fedora hardware.
+
+### Kubuntu Support (UNDER DEVELOPMENT)
+Kubuntu 26.04 LTS support is currently under active development.
+**Please note: Native Kubuntu testing has NOT yet been performed.**
+
+The target environment is Kubuntu 26.04 LTS running KDE Plasma 6.6, Plasma Wayland, and SDDM. 
+Because the current development/testing environment is Fedora, the Kubuntu branch (`kubuntu-support`) has been developed using a simulated Kubuntu filesystem and mocked system integration (`.dev/kubuntu-root/`). This strictly guarantees absolutely no accidental modifications or package installations to the host Fedora environment. The Kubuntu installer (`installers/kubuntu/install.sh`) actively refuses native installation against Fedora hosts for safety. Do not claim native Kubuntu compatibility until it has been tested on real Kubuntu.
+
+---
+
 ## Prerequisites
 
 Before installing, ensure your Linux distribution has the following packages installed (package names may vary depending on your distro):
