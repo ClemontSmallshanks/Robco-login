@@ -66,6 +66,9 @@ class BootState(TerminalState):
         self._cursor_col = 0
         self._finished = False
         
+        if hasattr(self.parent(), "audio"):
+            self.parent().audio.play("terminal_boot")
+        
         if self.config.boot.show_animation:
             self._timer.start(20)
         else:
@@ -117,6 +120,9 @@ class BootState(TerminalState):
         if self._current_char < len(text):
             self._lines[-1] += text[self._current_char]
             self._current_char += 1
+            
+            if hasattr(self.parent(), "audio") and not is_continuation:
+                self.parent().audio.play("terminal_key")
             
             # Request re-render of this character
             self.render()

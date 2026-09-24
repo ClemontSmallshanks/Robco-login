@@ -20,6 +20,9 @@ class TweaksState(TerminalState):
             "PHOSPHOR GLOW",
             "CRT NOISE",
             "BOOT SEQUENCE",
+            "TERMINAL SOUNDS",
+            "TERMINAL AMBIENCE",
+            "TERMINAL VOLUME",
             "RETURN",
         ]
         self._schemes = ["GREEN", "AMBER", "BLUE"]
@@ -75,21 +78,31 @@ class TweaksState(TerminalState):
         key = event.key()
 
         if key == Qt.Key.Key_Escape:
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_cancel")
             self._save_and_return()
             return True
 
         if key in (Qt.Key.Key_Up, Qt.Key.Key_W):
             self._current = (self._current - 1) % len(self._items)
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_nav")
             self.render()
             return True
         elif key in (Qt.Key.Key_Down, Qt.Key.Key_S):
             self._current = (self._current + 1) % len(self._items)
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_nav")
             self.render()
             return True
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_A):
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_select")
             self._toggle_setting(-1)
             return True
         elif key in (Qt.Key.Key_Right, Qt.Key.Key_D, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_select")
             self._toggle_setting(1)
             return True
             
@@ -137,6 +150,17 @@ class TweaksState(TerminalState):
             d_cfg.noise = not d_cfg.noise
         elif item == "BOOT SEQUENCE":
             self.config.boot.show_animation = not self.config.boot.show_animation
+        elif item == "TERMINAL SOUNDS":
+            self.config.audio.terminal_sfx = not self.config.audio.terminal_sfx
+        elif item == "TERMINAL AMBIENCE":
+            self.config.audio.terminal_ambience = not self.config.audio.terminal_ambience
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.update_volume()
+        elif item == "TERMINAL VOLUME":
+            new_vol = self.config.audio.volume + (direction * 0.1)
+            self.config.audio.volume = max(0.0, min(1.0, round(new_vol, 1)))
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.update_volume()
         elif item == "RETURN":
             if direction > 0:  # Only Enter/Right triggers return
                 self._save_and_return()
@@ -153,6 +177,7 @@ class TweaksState(TerminalState):
 
         d_cfg = self.config.display
         b_cfg = self.config.boot
+        a_cfg = self.config.audio
         
         values = [
             f"[{d_cfg.scheme.upper()}]",
@@ -160,6 +185,9 @@ class TweaksState(TerminalState):
             "[ON]" if d_cfg.phosphor_glow else "[OFF]",
             "[ON]" if d_cfg.noise else "[OFF]",
             "[ON]" if b_cfg.show_animation else "[OFF]",
+            "[ON]" if a_cfg.terminal_sfx else "[OFF]",
+            "[ON]" if a_cfg.terminal_ambience else "[OFF]",
+            f"[{int(a_cfg.volume * 100)}%]",
             "",
         ]
 

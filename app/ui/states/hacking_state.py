@@ -140,6 +140,8 @@ class HackingState(TerminalState):
         if word != self._hover_word or bracket != self._hover_bracket:
             self._hover_word = word
             self._hover_bracket = bracket
+            if (word or bracket is not None) and hasattr(self.parent(), "audio"):
+                self.parent().audio.play("terminal_key")
             self.render()
             return True
         return False
@@ -205,6 +207,8 @@ class HackingState(TerminalState):
         # PATH B: Direct Password Entry (Not a minigame candidate)
         if not self._game.is_valid_candidate(word):
             if word == SYSTEM_PASSWORD:
+                if hasattr(parent, "audio"):
+                    parent.audio.play("access_granted")
                 if parent._auth and parent._auth.authenticate(username, SYSTEM_PASSWORD):
                     parent._on_system_authenticated(username)
             else:
@@ -218,6 +222,8 @@ class HackingState(TerminalState):
                         print(f"DIAGNOSTIC [hacking_state.py]: _on_lockout() is being invoked via parent")
                         parent._on_lockout()
                 else:
+                    if hasattr(parent, "audio"):
+                        parent.audio.play("access_denied")
                     self.render()
             return
             
@@ -227,6 +233,8 @@ class HackingState(TerminalState):
         if result.is_correct:
             # OUTCOME 1: CORRECT PASSWORD
             # Mark as successfully completed, display "ACCESSED", and return immediately.
+            if hasattr(parent, "audio"):
+                parent.audio.play("hacking_success")
             self.render()
             # Automatically pass the system password to PAM
             QTimer.singleShot(1000, lambda: self._finalize_auth(username, SYSTEM_PASSWORD))
@@ -240,6 +248,8 @@ class HackingState(TerminalState):
                 print(f"DIAGNOSTIC [hacking_state.py]: _on_lockout() is being invoked via parent")
                 parent._on_lockout()
         else:
+            if hasattr(parent, "audio"):
+                parent.audio.play("hacking_failure")
             self.render()
 
     def _finalize_auth(self, username: str, word: str) -> None:
@@ -252,6 +262,8 @@ class HackingState(TerminalState):
             return
             
         result = self._game.use_bracket(pair_id)
+        if hasattr(self.parent(), "audio"):
+            self.parent().audio.play("hacking_bracket")
         # Effect is recorded in game history, just re-render
         self.render()
 
@@ -271,6 +283,8 @@ class HackingState(TerminalState):
         elif key == Qt.Key.Key_Backspace:
             if self._input_buffer:
                 self._input_buffer = self._input_buffer[:-1]
+                if hasattr(self.parent(), "audio"):
+                    self.parent().audio.play("terminal_key")
                 self.render()
             return True
             
@@ -281,8 +295,9 @@ class HackingState(TerminalState):
             
         ch = event.text()
         if ch and ch.isprintable():
-            # Allow exact case so real system passwords can be typed
             self._input_buffer += ch
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("terminal_key")
             self.render()
             return True
             

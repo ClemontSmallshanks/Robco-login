@@ -65,6 +65,8 @@ class MenuState(TerminalState):
         if self._confirming is not None:
             if key == Qt.Key.Key_Y:
                 idx = self._confirming
+                if hasattr(self.parent(), "audio"):
+                    self.parent().audio.play("menu_select")
                 self._confirming = None
                 self.render()
                 if idx == 2:
@@ -74,16 +76,22 @@ class MenuState(TerminalState):
                     if hasattr(self.parent(), "_on_restart"):
                         self.parent()._on_restart()
             elif key in (Qt.Key.Key_N, Qt.Key.Key_Escape):
+                if hasattr(self.parent(), "audio"):
+                    self.parent().audio.play("menu_cancel")
                 self._confirming = None
                 self.render()
             return True
 
         if key in (Qt.Key.Key_Up, Qt.Key.Key_W):
             self._current = (self._current - 1) % len(self._items)
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_nav")
             self.render()
             return True
         elif key in (Qt.Key.Key_Down, Qt.Key.Key_S):
             self._current = (self._current + 1) % len(self._items)
+            if hasattr(self.parent(), "audio"):
+                self.parent().audio.play("menu_nav")
             self.render()
             return True
         elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -93,6 +101,9 @@ class MenuState(TerminalState):
         return False
 
     def _select(self, idx: int) -> None:
+        if hasattr(self.parent(), "audio"):
+            self.parent().audio.play("menu_select")
+            
         if idx == 0:
             if hasattr(self.parent(), "_on_login_selected"):
                 self.parent()._on_login_selected()

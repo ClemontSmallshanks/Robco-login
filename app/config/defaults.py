@@ -37,7 +37,9 @@ class BootConfig:
 @dataclass
 class AudioConfig:
     enabled: bool = True
-    volume: float = 0.7
+    volume: float = 0.8
+    terminal_sfx: bool = True
+    terminal_ambience: bool = True
 
 
 @dataclass

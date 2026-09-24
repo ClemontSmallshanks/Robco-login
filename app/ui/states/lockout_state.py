@@ -21,6 +21,8 @@ class LockoutState(TerminalState):
     def enter(self, grid) -> None:
         super().enter(grid)
         self._blink_state = True
+        if hasattr(self.parent(), "audio"):
+            self.parent().audio.play("lockout")
         self._cursor_timer.start(530)
         self.render()
 

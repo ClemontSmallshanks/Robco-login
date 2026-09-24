@@ -20,6 +20,7 @@ from app.system.session import start_session
 from app.ui.crt_overlay import CRTOverlay
 from app.ui.terminal.renderer import TerminalRenderer
 from app.ui.states.base import TerminalState
+from app.system.audio import AudioPlayer
 
 if TYPE_CHECKING:
     from app.config.defaults import AppConfig
@@ -64,6 +65,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("RobCo Terminal")
         self.setMinimumSize(800, 600)
         self.setStyleSheet("background-color: #080808;")
+
+        # Audio System
+        self.audio = AudioPlayer(self._config, self)
 
         # Single terminal rendering surface
         self._renderer = TerminalRenderer(self._config, self)
