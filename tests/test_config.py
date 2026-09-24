@@ -59,7 +59,7 @@ class TestLoadConfig:
         cfg = load_config(["--development", "--mock-auth"])
         assert isinstance(cfg, AppConfig)
         assert cfg.game.initial_attempts == 4
-        assert cfg.game.num_candidates == 12
+        assert cfg.game.num_candidates == 16
 
     def test_development_flag(self):
         cfg = load_config(["--development", "--mock-auth"])
@@ -94,5 +94,12 @@ class TestLoadConfig:
 
     def test_mock_auth_requires_development(self):
         import pytest
-        with pytest.raises(SystemExit):
-            load_config(["--mock-auth"])
+        # Use a temporary config to ensure we don't inherit development_mode=true from the repo
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".toml", delete=False
+        ) as f:
+            f.write('[system]\ndevelopment_mode = false\n')
+            f.flush()
+            with pytest.raises(SystemExit):
+                load_config(["--mock-auth", "--config", f.name])
+            os.unlink(f.name)

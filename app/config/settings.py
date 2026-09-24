@@ -106,10 +106,14 @@ def load_config(argv: list[str] | None = None) -> AppConfig:
     if args.config:
         config_path = Path(args.config)
     else:
-        # Look next to the package first, then cwd
+        # Check user config first, then package directory, then cwd
+        user_config = Path.home() / ".config" / "robco-greeter" / "config.toml"
         pkg_dir = Path(__file__).resolve().parent.parent.parent
-        config_path = pkg_dir / "config.toml"
-        if not config_path.exists():
+        if user_config.exists():
+            config_path = user_config
+        elif (pkg_dir / "config.toml").exists():
+            config_path = pkg_dir / "config.toml"
+        else:
             config_path = Path.cwd() / "config.toml"
 
     # Load and merge TOML

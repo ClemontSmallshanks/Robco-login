@@ -97,10 +97,17 @@ class TweaksState(TerminalState):
 
     def _save_and_return(self) -> None:
         from pathlib import Path
-        config_path = Path(__file__).resolve().parent.parent.parent.parent / "config.toml"
-        if not config_path.parent.exists():
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-        save_config(config_path, self.config)
+        config_path = Path.home() / ".config" / "robco-greeter" / "config.toml"
+        try:
+            if not config_path.parent.exists():
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+            save_config(config_path, self.config)
+        except Exception as e:
+            with open("/tmp/robco-save-error.log", "w") as f:
+                import traceback
+                f.write(f"Failed to save config to {config_path}:\n")
+                f.write(traceback.format_exc())
+            print(f"DIAGNOSTIC [tweaks_state.py]: Failed to save config to {config_path}: {e}")
         
         if hasattr(self.parent(), "_on_return_to_menu"):
             self.parent()._on_return_to_menu()

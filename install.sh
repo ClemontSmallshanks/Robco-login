@@ -147,6 +147,10 @@ find "$STAGING_DIR" -type f ! -executable -exec chmod 644 {} \;
 find "$STAGING_DIR" -type f -name "*.so" -exec chmod 755 {} \;
 find "$STAGING_DIR" -type f -name "*.so.*" -exec chmod 755 {} \;
 
+# Allow greetd to save tweaks
+chown root:greetd "$STAGING_DIR/config.toml"
+chmod 664 "$STAGING_DIR/config.toml"
+
 # Secure the credentials file
 chown root:greetd "$STAGING_DIR/credentials.enc"
 chmod 640 "$STAGING_DIR/credentials.enc"
