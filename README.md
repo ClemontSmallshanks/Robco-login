@@ -2,6 +2,17 @@
 
 Hey folks, so this is replica of the hacking minigame from Fallout. Of course, you don't have to play the minigame, you can just enter your actual password and enter your system directly. It's a fun addition to my system lol. I have attached several screenshots of what it looks like while I was working on it. Also, I have only played New Vegas, so this minigame might be different on other fallout games, but I don't know about that. Cheers!!
 
+## Operating System Support
+
+### Native Fedora Support
+The primary development environment is Fedora Linux. The primary installer (`./install.sh`) is fully supported and tested natively on Fedora hardware.
+
+### Arch Support (UNDER DEVELOPMENT)
+An Arch deployment implementation is currently under active development. 
+**Please note: Arch has NOT been tested on real Arch hardware yet.**
+
+Because the development environment is Fedora, the Arch deployment branch (`arch-support`) has been developed using isolated simulated filesystem testing (`.dev/arch-root/`) to guarantee absolutely no accidental modifications to the host Fedora environment. The Arch installer (`installers/arch/install.sh`) actively refuses native installation against Fedora hosts for safety, and currently relies entirely on simulated tests to verify package resolution, systemd integration, and path structures. Do not claim real Arch compatibility until native Arch testing has actually occurred.
+
 ---
 
 ## Prerequisites
